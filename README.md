@@ -1,6 +1,6 @@
 ---
 title: 八八風災
-emoji: 🌊
+emoji: 🌀
 colorFrom: blue
 colorTo: indigo
 sdk: docker
