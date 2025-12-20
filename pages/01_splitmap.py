@@ -3,11 +3,11 @@ import geemap
 import ee
 import os
 
-# ==========================================
-# 1. GEE 驗證 (標準流程)
-# ==========================================
+# 🔹 請在這裡填入您的專案 ID
+MY_PROJECT_ID = '您的專案ID'  # <--- 請貼在這裡
+
 try:
-    ee.Initialize()
+    ee.Initialize(project=ee-julia200594714)
 except Exception:
     token = os.environ.get("EARTHENGINE_TOKEN")
     if token:
@@ -15,7 +15,9 @@ except Exception:
         os.makedirs(credential_folder, exist_ok=True)
         with open(os.path.join(credential_folder, "credentials"), 'w') as f:
             f.write(token)
-        ee.Initialize()
+        
+        # 這裡也要加 project
+        ee.Initialize(project=MY_PROJECT_ID)
     else:
         raise Exception("GEE 驗證失敗！")
 
