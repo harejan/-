@@ -9,7 +9,7 @@ WORKDIR /app
 # git 是為了以防需要從 GitHub 安裝特定的套件
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libgl1-mesa-glx \
+    libgl1 \
     git \
     && rm -rf /var/lib/apt/lists/*
 
