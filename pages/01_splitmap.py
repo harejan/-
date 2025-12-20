@@ -7,7 +7,7 @@ import os
 MY_PROJECT_ID = '您的專案ID'  # <--- 請貼在這裡
 
 try:
-    ee.Initialize(project=ee-julia200594714)
+    ee.Initialize(project='ee-julia200594714')
 except Exception:
     token = os.environ.get("EARTHENGINE_TOKEN")
     if token:
