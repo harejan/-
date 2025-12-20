@@ -43,7 +43,6 @@ def Page():
     
     with solara.Column(style={"padding": "20px", "max-width": "1200px", "margin": "0 auto"}):
         solara.Markdown("## 🗺️ 小林村 (Xiaolin Village) 衛星/地圖比對")
-        solara.Info("拖動中間的分隔桿，比對衛星影像與一般地圖的差異。")
         
         # 顯示地圖
         solara.display(m)
