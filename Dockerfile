@@ -24,7 +24,6 @@ COPY . .
 # 設定環境變數
 ENV SOLARA_MODE=production
 
-# ⚠️ 關鍵修正 1：開放 7860 埠號 (Hugging Face 規定)
-EXPOSE 7860
 
+EXPOSE 7860
 CMD ["solara", "run", "pages/00_home.py", "--host=0.0.0.0", "--port=7860"]

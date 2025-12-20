@@ -1,7 +1,7 @@
 import solara
 
 @solara.component
-def HomeParams():
+def Page(): 
     with solara.Column(style={"max-width": "800px", "margin": "0 auto"}):
         solara.Markdown("# 八八風災與小林村")
         
