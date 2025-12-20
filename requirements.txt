@@ -5,6 +5,8 @@ geopandas
 rasterio
 mapclassify
 python-dotenv
+geemap
+earthengine-api
 
 uvicorn
 websockets
