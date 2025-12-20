@@ -26,4 +26,4 @@ ENV SOLARA_MODE=production
 
 
 EXPOSE 7860
-CMD ["solara", "run", "pages/00_home.py", "--host=0.0.0.0", "--port=7860"]
+CMD ["solara", "run", "pages", "--host=0.0.0.0", "--port=7860"]
