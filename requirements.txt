@@ -5,7 +5,7 @@ geopandas
 rasterio
 mapclassify
 python-dotenv
-# 讓 Docker 運作順利的額外套件
+
 uvicorn
 websockets
 watchfiles
