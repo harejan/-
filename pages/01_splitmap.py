@@ -1,48 +1,29 @@
 import solara
-import ipyleaflet
+import geemap
+import ee
+import os
+import json
 
-def create_split_map():
-    m = ipyleaflet.Map(
-        center=[23.158, 120.640], 
-        zoom=14, # 稍微放大一點，比較適合觀察村落範圍
-        scroll_wheel_zoom=True,
-        height="600px"
-    )
-    
-    # 2. 定義左右兩張圖層
-    # 左邊：衛星影像 (Esri World Imagery)
-    left_layer = ipyleaflet.TileLayer(
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-        name="衛星影像"
-    )
-    
-    # 右邊：街道地圖 (OpenStreetMap)
-    right_layer = ipyleaflet.TileLayer(
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        name="街道地圖"
-    )
-
-    # 3. 建立捲簾控制器 (SplitMapControl)
-    split_control = ipyleaflet.SplitMapControl(
-        left_layer=left_layer, 
-        right_layer=right_layer
-    )
-    
-    # 4. 把控制器加到地圖上
-    m.add_control(split_control)
-    
-    # 加入比例尺 (選用，讓地圖更專業)
-    m.add_control(ipyleaflet.ScaleControl(position='bottomleft'))
-    
-    return m
-
-@solara.component
-def Page():
-    # 使用 use_memo 鎖定地圖狀態，避免重整時閃爍
-    m = solara.use_memo(create_split_map, dependencies=[])
-    
-    with solara.Column(style={"padding": "20px", "max-width": "1200px", "margin": "0 auto"}):
-        solara.Markdown("## 🗺️ 小林村 (Xiaolin Village) 衛星/地圖比對")
+# --- GEE 驗證與初始化 (雲端/本地 通用版) ---
+try:
+    # 1. 嘗試直接初始化 (適用於已驗證的本地環境)
+    ee.Initialize()
+    print("Google Earth Engine initialized successfully.")
+except Exception:
+    # 2. 如果失敗，檢查是否有環境變數 (適用於 Hugging Face)
+    token = os.environ.get("EARTHENGINE_TOKEN")
+    if token:
+        print("Found EARTHENGINE_TOKEN, attempting to authenticate...")
+        # 將 token 字串存成暫存檔案，這是最簡單讓 ee 讀取的方式
+        credential_path = os.path.expanduser("~/.config/earthengine/credentials")
+        os.makedirs(os.path.dirname(credential_path), exist_ok=True)
+        with open(credential_path, 'w') as f:
+            f.write(token)
         
-        # 顯示地圖
-        solara.display(m)
+        # 再次初始化
+        ee.Initialize()
+        print("Google Earth Engine initialized with Token.")
+    else:
+        # 3. 如果都沒有，就報錯
+        print("Error: GEE authentication failed. Please set EARTHENGINE_TOKEN.")
+        raise
