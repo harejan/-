@@ -2,7 +2,7 @@
 FROM python:3.10-slim
 
 # 設定工作目錄
-WORKDIR /app
+WORKDIR /00_home.py
 
 # 安裝必要的系統工具
 # libgl1-mesa-glx 是為了支援一些圖形處理 (有時候 map libraries 會需要)
