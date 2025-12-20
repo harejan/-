@@ -59,3 +59,5 @@ def Page():
         # 顯示地圖
         m = create_3d_map()
         solara.display(m)
+
+    Page()
