@@ -27,4 +27,4 @@ ENV SOLARA_MODE=production
 # 開放埠號
 EXPOSE 8765
 
-CMD ["solara", "run", "00_home.py", "--host=0.0.0.0", "--port=8765"]
+CMD ["solara", "run", "pages/00_home.py", "--host=0.0.0.0", "--port=8765"]
