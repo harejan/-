@@ -7,13 +7,9 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY . .
 
-# ❌ 刪除這一行！不要建立 __init__.py，讓 Solara 自動掃描檔案！
-# RUN touch pages/__init__.py  <-- 這行請刪掉，或者像這樣註解掉
-
-# 建立使用者
 RUN useradd -m -u 1000 user
 
-# ✅ 權限修正 (這行一定要保留！)
+# ✅ 權限這行一定要有
 RUN chown -R user:user /code
 
 USER user
@@ -28,5 +24,5 @@ ENV HOME=/home/user \
     SYSTEM=spaces \
     SOLARA_ASSETS_PROXY=False
 
-# ✅ 指向資料夾 (這會讓側邊欄出現)
+# ✅ 指向資料夾
 CMD ["solara", "run", "pages", "--host=0.0.0.0", "--port=7860"]
