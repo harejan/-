@@ -7,21 +7,17 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY . .
 
-# 1. 建立 init 檔案 (這是我們上一招，繼續保留)
-RUN touch pages/__init__.py
+# ❌ 刪除這一行！不要建立 __init__.py，讓 Solara 自動掃描檔案！
+# RUN touch pages/__init__.py  <-- 這行請刪掉，或者像這樣註解掉
 
-# 2. 建立使用者
+# 建立使用者
 RUN useradd -m -u 1000 user
 
-# ⭐⭐⭐ 關鍵修改在這裡！⭐⭐⭐
-# 把 /code 資料夾的所有權限，從 root 轉移給 user
-# 這樣 user 才能寫入臨時檔，不會因為權限不足而崩潰
+# ✅ 權限修正 (這行一定要保留！)
 RUN chown -R user:user /code
 
-# 切換身分
 USER user
 
-# 設定環境變數
 ENV HOME=/home/user \
     PATH=/home/user/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
@@ -30,8 +26,7 @@ ENV HOME=/home/user \
     GRADIO_SERVER_NAME=0.0.0.0 \
     GRADIO_THEME=huggingface \
     SYSTEM=spaces \
-    # 關閉 Log 裡的 assets proxy 警告
     SOLARA_ASSETS_PROXY=False
 
-# 啟動指令 (指向 pages 資料夾)
+# ✅ 指向資料夾 (這會讓側邊欄出現)
 CMD ["solara", "run", "pages", "--host=0.0.0.0", "--port=7860"]
