@@ -6,12 +6,9 @@ import os
 # ==========================================
 # 1. GEE 驗證與初始化
 # ==========================================
-
-# 您的專案 ID
-MY_PROJECT_ID = 'ee-julia200594714'
+MY_PROJECT_ID = 'ee-julia200594714' 
 
 try:
-    # 嘗試直接連線
     ee.Initialize(project=MY_PROJECT_ID)
     print("Google Earth Engine initialized (Local).")
 except Exception:
@@ -19,65 +16,56 @@ except Exception:
     token = os.environ.get("EARTHENGINE_TOKEN")
     
     if token:
-        # ⭐ 強制清潔 Token，去除隱藏符號
         token = token.strip()
-        
-        # 建立驗證檔路徑
         credential_folder = os.path.expanduser("~/.config/earthengine/")
         os.makedirs(credential_folder, exist_ok=True)
-        credential_path = os.path.join(credential_folder, "credentials")
-        
-        # 寫入 Token
-        with open(credential_path, 'w') as f:
+        with open(os.path.join(credential_folder, "credentials"), 'w') as f:
             f.write(token)
-        
-        # 再次初始化
         ee.Initialize(project=MY_PROJECT_ID)
         print("Google Earth Engine initialized (Cloud).")
     else:
-        raise Exception("GEE 驗證失敗！請檢查 EARTHENGINE_TOKEN 設定")
+        raise Exception("GEE 驗證失敗！")
 
 # ==========================================
-# 2. 建立地圖組件
+# 2. 街道圖 vs 災後影像
 # ==========================================
 @solara.component
 def Page():
-    solara.Title("八八風災前後對比 (Landsat 5 歷史影像)")
+    solara.Title("地圖對照：現代街道圖 vs 2009 災後現場")
 
-    map_center = [23.161, 120.645] 
-    map_zoom = 13  
-
-    date_before_start = '2008-01-01'
-    date_before_end   = '2009-08-01'
+    map_center = [23.161, 120.645]
+    map_zoom = 13
     date_after_start  = '2009-08-15'
     date_after_end    = '2009-12-31'
 
-    with solara.Card(title="2009 八八風災 - 小林村崩塌與土石流"):
-        m = geemap.Map(center=map_center, zoom=map_zoom, height="600px")
+    with solara.Card(title="對比：地圖上的路網 vs 實際被淹沒的區域"):
+        
+        # ⭐⭐⭐ 修改這裡：關閉工具列與繪圖工具 ⭐⭐⭐
+        m = geemap.Map(
+            center=map_center, 
+            zoom=map_zoom, 
+            height="600px",
+            toolbar_ctrl=False, 
+            draw_ctrl=False
+        )
 
         l5 = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2")
-
         vis_params = {
             'min': 8000,
             'max': 17000,
             'bands': ['SR_B3', 'SR_B2', 'SR_B1'], 
-            'gamma': 1.2
+            'gamma': 1.3
         }
 
-        def get_best_image(start, end, point):
-            return (l5
-                .filterBounds(point)
-                .filterDate(start, end)
-                .sort('CLOUD_COVER')
-                .first()
-            )
-
         point = ee.Geometry.Point([map_center[1], map_center[0]])
-        image_before = get_best_image(date_before_start, date_before_end, point)
-        image_after = get_best_image(date_after_start, date_after_end, point)
+        image_after = (l5
+            .filterBounds(point)
+            .filterDate(date_after_start, date_after_end)
+            .sort('CLOUD_COVER')
+            .first()
+        )
+        
+        right_layer = geemap.ee_tile_layer(image_after, vis_params, '2009 災後影像')
 
-        left_layer = geemap.ee_tile_layer(image_before, vis_params, '災前 (2009上半年)')
-        right_layer = geemap.ee_tile_layer(image_after, vis_params, '災後 (2009下半年)')
-
-        m.split_map(left_layer, right_layer)
+        m.split_map(left_layer='ROADMAP', right_layer=right_layer)
         solara.display(m)
