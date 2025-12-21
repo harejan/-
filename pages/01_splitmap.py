@@ -3,23 +3,33 @@ import geemap
 import ee
 import os
 
-# 🔹 請在這裡填入您的專案 ID
-MY_PROJECT_ID = '您的專案ID'  # <--- 請貼在這裡
+# ==========================================
+# 1. GEE 驗證與初始化 
+# ==========================================
+MY_PROJECT_ID = 'ee-julia200594714' 
 
 try:
-    ee.Initialize(project='ee-julia200594714')
+    # 嘗試直接連線
+    ee.Initialize(project=MY_PROJECT_ID)
+    print("Google Earth Engine initialized (Local).")
 except Exception:
+    print("Local auth failed. Checking for HF Secrets...")
     token = os.environ.get("EARTHENGINE_TOKEN")
+    
     if token:
+        # ⭐⭐⭐ 關鍵修改：強制清潔 Token，刪除隱藏符號 ⭐⭐⭐
+        token = token.strip()
+        
         credential_folder = os.path.expanduser("~/.config/earthengine/")
         os.makedirs(credential_folder, exist_ok=True)
         with open(os.path.join(credential_folder, "credentials"), 'w') as f:
             f.write(token)
         
-        # 這裡也要加 project
+        # 再次初始化 (加入 project 參數)
         ee.Initialize(project=MY_PROJECT_ID)
+        print("Google Earth Engine initialized (Cloud).")
     else:
-        raise Exception("GEE 驗證失敗！")
+        raise Exception("GEE 驗證失敗！請確認 EARTHENGINE_TOKEN")
 
 # ==========================================
 # 2. 街道圖 vs 災後影像
@@ -66,10 +76,7 @@ def Page():
 
         # --- 執行捲簾 ---
         # left_layer='ROADMAP' 代表使用 Google 的標準街道圖 (現在年份)
-        # 或者可以用 'HYBRID' (衛星+路網)
         m.split_map(left_layer='ROADMAP', right_layer=right_layer)
 
         # 顯示
         solara.display(m)
-        
-        solara.Info("左側為現代街道圖 (Current Map)，右側為 2009 年災後影像。您可以觀察原本規劃的道路在災後影像中是否已被土石掩埋。")
