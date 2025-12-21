@@ -1,29 +1,26 @@
-# 使用輕量級的 Python 3.10 映像檔
-FROM python:3.10-slim
+FROM python:3.10
 
-# 設定工作目錄
-WORKDIR /app
+WORKDIR /code
 
-# 安裝必要的系統工具 (GIS 套件需要)
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libgl1 \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
-# 複製 requirements.txt
-COPY requirements.txt .
-
-# 升級 pip 並安裝套件
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# 複製所有檔案
 COPY . .
 
-# 設定環境變數
-ENV SOLARA_MODE=production
+# ⭐⭐⭐ 關鍵修改 1：強迫系統幫我們產生 __init__.py ⭐⭐⭐
+# 這樣就算 Git 沒有上傳這個檔案，Docker 也會自己做一個出來！
+RUN touch pages/__init__.py
 
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
 
-EXPOSE 7860
-CMD ["solara", "run", "./pages", "--host=0.0.0.0", "--port=7860"]
+ENV PYTHONUNBUFFERED=1 \
+    GRADIO_ALLOW_FLAGGING=never \
+    GRADIO_NUM_PORTS=1 \
+    GRADIO_SERVER_NAME=0.0.0.0 \
+    GRADIO_THEME=huggingface \
+    SYSTEM=spaces
+
+CMD ["solara", "run", "pages", "--host=0.0.0.0", "--port=7860"]
