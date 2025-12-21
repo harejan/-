@@ -60,4 +60,3 @@ def Page():
         m = create_3d_map()
         solara.display(m)
 
-    Page()

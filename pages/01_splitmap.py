@@ -73,5 +73,3 @@ def Page():
         solara.display(m)
         
         solara.Info("左側為現代街道圖 (Current Map)，右側為 2009 年災後影像。您可以觀察原本規劃的道路在災後影像中是否已被土石掩埋。")
-
-Page()

@@ -92,6 +92,3 @@ def Page():
         m.split_map(left_layer, right_layer)
 
         solara.display(m)
-
-# 執行頁面
-Page()
