@@ -5,22 +5,25 @@ import leafmap.foliumap as leafmap
 import json
 
 # ==========================================
-# 1. 強健的 GEE 初始化 (修正 Project ID 與 API 報錯)
+# 1. GEE 初始化 (解決 Project ID 與認證問題)
 # ==========================================
 def init_gee():
     try:
-        # 取得 Secrets 環境變數
+        # 取得環境變數
         sa = os.environ.get("GEE_SERVICE_ACCOUNT")
         key = os.environ.get("GEE_JSON_KEY")
-        project = "ee-julia200594714"
+        # 修正：讀取變數名稱 GEE_PROJECT，若沒設則嘗試從金鑰中自動抓取
+        project = os.environ.get("GEE_PROJECT") 
         
         if sa and key:
-            # 解析金鑰，若沒設 GEE_PROJECT 則嘗試從金鑰中自動抓取
             key_dict = json.loads(key)
             if not project:
                 project = key_dict.get("project_id")
             
-            # 初始化認證
+            # 若自動抓取也失敗，請在此手動補上您的 ID，例如 "ee-julia200594714"
+            if not project:
+                project = "ee-julia200594714"
+
             credentials = ee.ServiceAccountCredentials(sa, key_data=key)
             ee.Initialize(credentials, project=project)
             return True, f"✅ 雲端認證成功 (專案: {project})"
@@ -45,17 +48,19 @@ def run_morakot_analysis():
                 .filterDate(start, end) \
                 .filter(ee.Filter.lt('CLOUD_COVER', 30)) \
                 .median()
+        # 計算 NDVI 並命名為 'NDVI'
         return img.normalizedDifference(['SR_B4', 'SR_B3']).rename('NDVI')
 
     # 風災前 (2009) 與 風災後 (2010)
     pre_ndvi = get_ndvi('2009-01-01', '2009-07-31')
     post_ndvi = get_ndvi('2010-01-01', '2010-07-31')
 
-    # 核心計算：變遷圖 (後減前)
+    # 核心計算：變遷圖 (後減前: 2010 - 2009)
+    # 負值代表植生減少，正值代表植生增加
     diff = post_ndvi.subtract(pre_ndvi)
 
     # --- 比例統計邏輯 ---
-    # 分類：紅 (< -0.1), 綠 (> 0.1), 白 (-0.1 ~ 0.1)
+    # 分類門檻：減少 (< -0.1), 增加 (> 0.1), 穩定 (-0.1 ~ 0.1)
     red_mask = diff.lt(-0.1).rename('red')
     green_mask = diff.gt(0.1).rename('green')
     neutral_mask = diff.gte(-0.1).And(diff.lte(0.1)).rename('neutral')
@@ -69,7 +74,7 @@ def run_morakot_analysis():
         maxPixels=1e9
     ).getInfo()
 
-    # 安全計算百分比
+    # 安全計算百分比，防止 None 或 0 導致報錯
     r_val = stats.get('red', 0) or 0
     g_val = stats.get('green', 0) or 0
     n_val = stats.get('neutral', 0) or 0
@@ -87,7 +92,7 @@ def run_morakot_analysis():
 # ==========================================
 @solara.component
 def Page():
-    # 執行初始化
+    # 執行初始化 (使用 use_memo 確保只執行一次)
     ok, msg = solara.use_memo(init_gee, [])
     
     with solara.Column(style={"padding": "20px"}):
@@ -97,7 +102,7 @@ def Page():
             # 取得運算結果
             diff_img, ratios = run_morakot_analysis()
             
-            # A. 比例統計卡片
+            # A. 比例統計卡片 (顯示三色比例)
             solara.Markdown("### 📊 區域影響比例統計 (2010年 vs 2009年)")
             with solara.Row():
                 with solara.Card("🔴 植生減少 (受災)", style={"flex": "1", "color": "#d32f2f", "border-top": "5px solid red"}):
@@ -108,7 +113,7 @@ def Page():
                     solara.Markdown(f"## {ratios['green']:.2%}")
 
             # B. 地圖顯示
-            solara.Markdown("### 🗺️ NDVI 變遷分佈圖")
+            solara.Markdown("### 🗺️ NDVI 變遷分佈圖 (後減前)")
             m = leafmap.Map(center=[23.16, 120.63], zoom=12)
             
             # 設定視覺化參數 (紅, 白, 綠)
@@ -118,7 +123,8 @@ def Page():
                 'palette': ['#ff0000', '#ffffff', '#00ff00']
             }
             
-            m.add_layer(diff_img, diff_vis, "八八風災 NDVI 變遷")
+            # --- 關鍵修正：針對 EE 物件必須使用 add_ee_layer ---
+            m.add_ee_layer(diff_img, diff_vis, "八八風災 NDVI 變遷")
             
             # 加入圖例
             legend_dict = {
@@ -128,12 +134,13 @@ def Page():
             }
             m.add_legend(title="變遷分類說明", legend_dict=legend_dict)
             
+            # 顯示地圖
             solara.display(m)
             
         else:
             # 顯示錯誤引導
             solara.Error(f"初始化失敗：{msg}")
             solara.Markdown("#### 🛠️ 請檢查您的環境變數設定：")
-            solara.Markdown("- **GEE_PROJECT**: 必須填寫您的 Google Cloud Project ID")
-            solara.Markdown("- **GEE_SERVICE_ACCOUNT**: 服務帳戶 Email")
-            solara.Markdown("- **GEE_JSON_KEY**: 完整的 JSON 金鑰字串")
+            solara.Markdown("1. **GEE_PROJECT**: 必須填寫您的 Google Cloud Project ID (例如: `ee-julia200594714`)")
+            solara.Markdown("2. **GEE_SERVICE_ACCOUNT**: 服務帳戶 Email")
+            solara.Markdown("3. **GEE_JSON_KEY**: 完整的 JSON 金鑰字串")
