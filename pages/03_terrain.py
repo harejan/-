@@ -20,10 +20,10 @@ def create_3d_map():
     
     m = leafmap.Map(
         style=style_url,
-        center=[120.645, 23.159], # ✅ 修改中心：小林村與獻肚山
-        zoom=14,                  # ✅ 放大：更清楚看到崩塌地細節
-        pitch=80,                 # 傾斜角度：模擬低空飛越
-        bearing=90,               # ✅ 視角：面向正東方 (面對獻肚山崩塌面)
+        center=[120.645, 23.159], 
+        zoom=14,                  
+        pitch=80,                 
+        bearing=90,               
     )
     
     # 步驟 A: 加入地形資料源 (Source)
@@ -49,12 +49,11 @@ def Page():
         
         # 浮動資訊卡片
         with solara.Card(style={"position": "absolute", "top": "10px", "left": "10px", "z-index": "1000", "width": "320px"}):
-            solara.Markdown("## ⛰️ 小林村與獻肚山 3D 地形")
+            solara.Markdown("## ⛰️ 獻肚山3D地形")
             if not MAPTILER_KEY:
                 solara.Error("⚠️ 請設定 MapTiler API Key 以檢視 3D 地形。")
             else:
                 solara.Markdown("視角正對**獻肚山**崩塌面。")
-                solara.Markdown("按住 **滑鼠右鍵** 拖曳可旋轉視角觀察順向坡結構。")
 
         # 顯示地圖
         m = create_3d_map()

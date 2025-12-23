@@ -32,7 +32,7 @@ except Exception:
 # ==========================================
 @solara.component
 def Page():
-    solara.Title("八八風災前後對比 (Landsat 5 歷史影像)")
+    solara.Title("八八風災前後對比")
 
     map_center = [23.161, 120.645] 
     map_zoom = 13  
@@ -42,8 +42,7 @@ def Page():
     date_after_start  = '2009-08-15'
     date_after_end    = '2009-12-31'
 
-    with solara.Card(title="2009 八八風災 - 小林村崩塌與土石流"):
-        # ⭐⭐⭐ 修改這裡：關閉工具列與繪圖工具，避免崩潰 ⭐⭐⭐
+    with solara.Card(title="2009 八八風災"):
         m = geemap.Map(
             center=map_center, 
             zoom=map_zoom, 
@@ -73,8 +72,8 @@ def Page():
         image_before = get_best_image(date_before_start, date_before_end, point)
         image_after = get_best_image(date_after_start, date_after_end, point)
 
-        left_layer = geemap.ee_tile_layer(image_before, vis_params, '災前 (2009上半年)')
-        right_layer = geemap.ee_tile_layer(image_after, vis_params, '災後 (2009下半年)')
+        left_layer = geemap.ee_tile_layer(image_before, vis_params, '災前')
+        right_layer = geemap.ee_tile_layer(image_after, vis_params, '災後')
 
         m.split_map(left_layer, right_layer)
         solara.display(m)

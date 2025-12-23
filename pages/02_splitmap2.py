@@ -31,16 +31,15 @@ except Exception:
 # ==========================================
 @solara.component
 def Page():
-    solara.Title("地圖對照：現代街道圖 vs 2009 災後現場")
+    solara.Title("地圖對照：街道圖 vs 八八風災前")
 
     map_center = [23.161, 120.645]
     map_zoom = 13
-    date_after_start  = '2009-08-15'
-    date_after_end    = '2009-12-31'
+    date_after_start  = '2009-01-01'
+    date_after_end    = '2009-08-01'
 
-    with solara.Card(title="對比：地圖上的路網 vs 實際被淹沒的區域"):
+    with solara.Card(title="對比：地圖上的路網 vs 災害前"):
         
-        # ⭐⭐⭐ 修改這裡：關閉工具列與繪圖工具 ⭐⭐⭐
         m = geemap.Map(
             center=map_center, 
             zoom=map_zoom, 
@@ -65,7 +64,7 @@ def Page():
             .first()
         )
         
-        right_layer = geemap.ee_tile_layer(image_after, vis_params, '2009 災後影像')
+        right_layer = geemap.ee_tile_layer(image_after, vis_params, '災前影像')
 
         m.split_map(left_layer='ROADMAP', right_layer=right_layer)
         solara.display(m)
