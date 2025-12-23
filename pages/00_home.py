@@ -1,4 +1,13 @@
 import solara
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# 1. 準備數據 (放在函數外或內皆可，建議放在內或使用 memo)
+data = {
+    'Date': ['8/6', '8/7', '8/8', '8/9', '8/10'],
+    'Rainfall': [56, 762, 1165, 856, 112]
+}
+df_rain = pd.DataFrame(data)
 
 @solara.component
 def Page(): 
@@ -16,41 +25,31 @@ def Page():
         
         在連續暴雨的沖刷下，村落東北方的獻肚山發生大規模深層崩塌。超過 3,000 萬立方公尺的土石瞬間傾洩而下，將小林村第 9 至 18 鄰完全掩埋。隨後，土石阻斷旗山溪形成堰塞湖，潰決後的洪水造成了毀滅性的二次災害。
         """)
-        import matplotlib.pyplot as plt
-import pandas as pd
 
-data = {
-    'Date': ['8/6', '8/7', '8/8', '8/9', '8/10'],
-    'Rainfall': [56, 762, 1165, 856, 112]
-}
-# 轉成 DataFrame 表格格式
-df_rain = pd.DataFrame(data)
+        solara.Markdown("### 📊 降雨量統計圖")
 
-# --- 開始畫圖 ---
-plt.figure(figsize=(10, 6))
+        # --- 開始繪圖邏輯 ---
+        # 在 Solara 中，我們需要建立一個 figure 物件
+        fig, ax = plt.subplots(figsize=(10, 6))
 
-# 畫出長條圖，使用深藍色代表降雨
-# alpha 是透明度，0.8 比較不刺眼
-bars = plt.bar(df_rain['Date'], df_rain['Rainfall'], color='#1f77b4', alpha=0.8)
+        # 畫出長條圖
+        bars = ax.bar(df_rain['Date'], df_rain['Rainfall'], color='#1f77b4', alpha=0.8)
 
-for bar in bars:
-    yval = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2, yval + 10, int(yval), 
-             ha='center', va='bottom', fontsize=12, fontweight='bold')
+        # 加上數值標籤
+        for bar in bars:
+            yval = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2, yval + 10, int(yval), 
+                    ha='center', va='bottom', fontsize=12, fontweight='bold')
 
-# 設定標題與標籤
-plt.title('Daily Rainfall During Typhoon Morakot (Alishan Station)', fontsize=15)
-plt.xlabel('Date (Aug 2009)', fontsize=12)
-plt.ylabel('Accumulated Rainfall (mm)', fontsize=12)
+        # 設定標題與標籤
+        ax.set_title('Daily Rainfall During Typhoon Morakot (Alishan Station)', fontsize=15)
+        ax.set_xlabel('Date (Aug 2009)', fontsize=12)
+        ax.set_ylabel('Accumulated Rainfall (mm)', fontsize=12)
+        ax.set_ylim(0, 1400) 
+        ax.grid(axis='y', linestyle='--', alpha=0.5)
 
-# 設定 Y 軸範圍
-plt.ylim(0, 1400) 
-
-# 加個虛線網格，比較好對照數值
-plt.grid(axis='y', linestyle='--', alpha=0.5)
-
-# 顯示圖表
-plt.show()
+        # 使用 Solara 專用組件顯示 Matplotlib 圖表
+        solara.FigureMatplotlib(fig)
 
 
         
