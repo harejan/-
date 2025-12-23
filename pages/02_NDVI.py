@@ -16,4 +16,4 @@ def Page():
     # 這裡加入你之前的 NDVI 運算與圖層
     # m.add_layer(diff, diff_params, "植被減少區域 (變遷)")
     
-    solara.FigureLeaflet(m)
+   solara.display(m)
