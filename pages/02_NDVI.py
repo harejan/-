@@ -5,11 +5,11 @@ import leafmap.foliumap as leafmap
 import json
 
 # ==========================================
-# 1. 初始化 GEE (確保 Project ID 正確)
+# 1. 初始化 GEE
 # ==========================================
 def init_gee():
     try:
-        # 請確認此 ID 為您的 Google Cloud 專案 ID
+        # 強制使用您的 Project ID
         my_project_id = "ee-julia200594714" 
         sa = os.environ.get("GEE_SERVICE_ACCOUNT")
         key = os.environ.get("GEE_JSON_KEY")
@@ -25,30 +25,31 @@ def init_gee():
         return False, f"❌ 初始化失敗: {str(e)}"
 
 # ==========================================
-# 2. 核心運算：災前災後 NDVI 與差異
+# 2. 核心分析邏輯 (Landsat 5)
 # ==========================================
 def run_morakot_analysis():
-    # 高雄山區受災中心 (六龜/甲仙區域)
+    # 高雄山區受災中心點
     roi = ee.Geometry.Point([120.63, 23.16]).buffer(15000).bounds()
 
-    def get_ndvi_data(start, end):
+    def get_ndvi_layer(start, end):
+        # 抓取 Landsat 5 影像並計算 NDVI
+        # 擴大一點日期範圍確保有影像存在
         dataset = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2") \
                     .filterBounds(roi) \
                     .filterDate(start, end) \
-                    .filter(ee.Filter.lt('CLOUD_COVER', 30)) \
                     .median()
-        # 計算 NDVI (Landsat 5: B4=NIR, B3=Red)
+        
         ndvi = dataset.normalizedDifference(['SR_B4', 'SR_B3']).rename('NDVI')
-        return dataset.clip(roi), ndvi.clip(roi)
+        return ndvi.clip(roi)
 
-    # 取得 2009 (災前) 與 2010 (災後) 影像
-    pre_img, pre_ndvi = get_ndvi_data('2009-01-01', '2009-07-30')
-    post_img, post_ndvi = get_ndvi_data('2010-01-01', '2010-07-30')
+    # 災前 (2009) 與 災後 (2010)
+    pre_ndvi = get_ndvi_layer('2009-01-01', '2009-08-01')
+    post_ndvi = get_ndvi_layer('2010-01-01', '2010-08-01')
 
-    # 計算變遷差異 (2010 - 2009)
+    # 計算差值 (2010 - 2009)
     diff = post_ndvi.subtract(pre_ndvi)
 
-    # 比例統計
+    # 比例統計 (紅、白、綠)
     red_mask = diff.lt(-0.1).rename('red')
     green_mask = diff.gt(0.1).rename('green')
     neutral_mask = diff.gte(-0.1).And(diff.lte(0.1)).rename('neutral')
@@ -57,55 +58,61 @@ def run_morakot_analysis():
         reducer=ee.Reducer.sum(), geometry=roi, scale=30, maxPixels=1e9
     ).getInfo()
 
-    r, g, n = stats.get('red', 0) or 0, stats.get('green', 0) or 0, stats.get('neutral', 0) or 0
+    r = stats.get('red', 0) or 0
+    g = stats.get('green', 0) or 0
+    n = stats.get('neutral', 0) or 0
     total = r + g + n
     ratios = {"red": r/total, "green": g/total, "neutral": n/total} if total > 0 else {"red":0,"green":0,"neutral":0}
 
-    return pre_img, post_img, diff, ratios
+    return diff, ratios
 
 # ==========================================
-# 3. Solara 介面渲染
+# 3. Solara 介面呈現
 # ==========================================
 @solara.component
 def Page():
-    # 初始化
     ok, msg = solara.use_memo(init_gee, [])
     
     with solara.Column(style={"padding": "20px"}):
-        solara.Title("🛰️ 八八風災前後 NDVI 變遷監測 (2009-2010)")
+        solara.Title("🛰️ 八八風災前後 NDVI 變遷監測系統")
         
         if ok:
-            # 取得運算結果
-            pre_img, post_img, diff_img, ratios = run_morakot_analysis()
+            diff_img, ratios = run_morakot_analysis()
             
-            # --- 顯示比例卡片 ---
+            # A. 比例卡片
             with solara.Row():
-                with solara.Card("🔴 植生減少 (崩塌)", style={"flex": "1", "color": "#d32f2f"}):
+                with solara.Card("🔴 植生減少", style={"flex": "1", "color": "#d32f2f"}):
                     solara.Markdown(f"## {ratios['red']:.2%}")
-                with solara.Card("⚪ 穩定區域", style={"flex": "1"}):
+                with solara.Card("⚪ 環境穩定", style={"flex": "1"}):
                     solara.Markdown(f"## {ratios['neutral']:.2%}")
-                with solara.Card("🟢 植生增加 (復甦)", style={"flex": "1", "color": "#388e3c"}):
+                with solara.Card("🟢 植生增加", style={"flex": "1", "color": "#388e3c"}):
                     solara.Markdown(f"## {ratios['green']:.2%}")
 
-            # --- 地圖呈現 ---
+            # B. 地圖區域
+            # 使用 HYBRID 底圖更能看出地形
             m = leafmap.Map(center=[23.16, 120.63], zoom=12, height=600)
-            
-            # 視覺化參數：原始影像 (SR) 與 差異 (紅白綠)
-            rgb_vis = {'bands': ['SR_B3', 'SR_B2', 'SR_B1'], 'min': 0, 'max': 15000}
-            diff_vis = {'min': -0.5, 'max': 0.5, 'palette': ['#ff0000', '#ffffff', '#00ff00']}
+            m.add_basemap("HYBRID") 
 
-            # 加入圖層
-            m.add_ee_layer(diff_img, diff_vis, "NDVI 變遷圖 (2010-2009)")
+            # 設定差異視覺化
+            diff_vis = {
+                'min': -0.5, 
+                'max': 0.5, 
+                'palette': ['#ff0000', '#ffffff', '#00ff00']
+            }
+            
+            # 加入 GEE 圖層
+            m.add_ee_layer(diff_img, diff_vis, "NDVI 變遷層")
             
             # 加入圖例
-            m.add_legend(title="變遷分類說明", legend_dict={
-                '植生減少 (崩塌地)': '#ff0000',
+            m.add_legend(title="變遷分類", legend_dict={
+                '植生減少 (崩塌)': '#ff0000',
                 '環境穩定': '#ffffff',
                 '植生增加 (復甦)': '#00ff00'
             })
             
-            # --- 使用最穩定的方式顯示地圖 ---
-            solara.display(m)
+            # --- 關鍵修正：強制將 Folium 物件轉為 HTML 渲染 ---
+            map_html = m._repr_html_()
+            solara.HTML(map_html, style={"height": "600px", "width": "100%"})
             
         else:
-            solara.Error(f"初始化失敗：{msg}")
+            solara.Error(f"GEE 初始化失敗: {msg}")
