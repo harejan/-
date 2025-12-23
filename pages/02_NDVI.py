@@ -112,7 +112,8 @@ def Page():
                 '環境穩定': '#ffffff',
                 '植生增加 (復甦)': '#00ff00'
             })
-            
+            test_img=ee.Image(0.1).clip(ee.Geometry.Point([23.16, 120.63]).buffer(100000))
+            m.add_ee_layer(test_img,{'min':0,'msx':1,'palette':['red']},"test")
             solara.display(m)
         else:
             solara.Error(f"初始化失敗：{msg}")
