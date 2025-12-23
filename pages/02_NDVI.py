@@ -115,4 +115,4 @@ def Page():
 
         elif result.state == solara.ResultState.RUNNING:
             solara.Info("⏳ 載入中，請稍候...")
-            solara.ProgressLinear(True)
+            solara.ProgressLinear(True) 
