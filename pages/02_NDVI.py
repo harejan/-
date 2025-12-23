@@ -6,109 +6,108 @@ import geemap.foliumap as geemap
 from google.oauth2 import service_account
 
 # ==========================================
-# 1. GEE 認證與初始化 (Hugging Face 專屬版本)
+# 1. GEE 初始化與認證 (與主頁保持一致)
 # ==========================================
-MY_PROJECT_ID = 'ee-julia200594714' 
+MY_PROJECT_ID = 'ee-julia200594714'
 
 def initialize_gee():
     try:
-        # 從環境變數讀取 JSON 金鑰
         gee_key = os.environ.get("GEE_SERVICE_ACCOUNT")
-        
         if gee_key:
             info = json.loads(gee_key)
             credentials = service_account.Credentials.from_service_account_info(info)
             ee.Initialize(credentials, project=MY_PROJECT_ID)
-            return True, "✅ 服務帳戶認證成功"
+            return True, "✅ 初始化成功"
         else:
-            # 本地測試時使用
-            ee.Initialize(project=MY_PROJECT_ID)
-            return True, "✅ 本地初始化成功"
+            return False, "找不到 GEE_SERVICE_ACCOUNT Secret"
     except Exception as e:
         return False, str(e)
 
 # ==========================================
-# 2. 地理運算邏輯 (小林村區域)
+# 2. 地理運算邏輯
 # ==========================================
-def get_satellite_layer(map_center):
-    # 擴大範圍，使用 2008-2009 年的中位數合成以達到無雲效果
-    date_pre_start = '2008-01-01'
-    date_pre_end   = '2009-08-01'
+def get_ndvi_analysis():
+    # 小林村 ROI
+    roi = ee.Geometry.Polygon([[[120.61, 23.185], [120.61, 23.135], [120.67, 23.135], [120.67, 23.185], [120.61, 23.185]]])
     
-    # 讀取 Landsat 5
-    l5 = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2")
-    
-    # True Color 視覺參數
-    vis_params = {
-        'min': 7000,
-        'max': 16000,
-        'bands': ['SR_B3', 'SR_B2', 'SR_B1'], 
-        'gamma': 1.4
-    }
+    def addNDVI(img):
+        return img.addBands(img.normalizedDifference(['SR_B4', 'SR_B3']).rename('NDVI'))
 
-    # 中位數合成，過濾雲量大於 20% 的片子
-    image_pre = (l5
-        .filterBounds(ee.Geometry.Point([map_center[1], map_center[0]]))
-        .filterDate(date_pre_start, date_pre_end)
-        .filter(ee.Filter.lt('CLOUD_COVER', 20))
-        .median()
-    )
+    # 取得災前(2008)與災後(2010)中位數影像
+    pre_img = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2").filterDate('2008-01-01', '2008-12-31').filterBounds(roi).map(addNDVI).median().clip(roi)
+    post_img = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2").filterDate('2010-01-01', '2010-12-31').filterBounds(roi).map(addNDVI).median().clip(roi)
+
+    # 計算 NDVI 差異 (2010 - 2008)
+    diff = post_img.select('NDVI').subtract(pre_img.select('NDVI'))
+
+    # 統計分類
+    def classify(img):
+        severe = img.lt(-0.3).rename('severe')
+        loss = img.lt(-0.1).And(img.gte(-0.3)).rename('loss')
+        stable = img.gte(-0.1).rename('stable')
+        return img.addBands([severe, loss, stable])
+
+    classified = classify(diff)
+    stats = classified.reduceRegion(reducer=ee.Reducer.sum(), geometry=roi, scale=30, maxPixels=1e9).getInfo()
     
-    return geemap.ee_tile_layer(image_pre, vis_params, '災前清晰影像')
+    return diff, stats
 
 # ==========================================
-# 3. Solara UI 組件 (修正 Divider 錯誤)
+# 3. UI 呈現
 # ==========================================
 @solara.component
 def Page():
-    # 呼叫初始化
+    # 初始化
     is_ok, msg = solara.use_memo(initialize_gee, [])
     
-    # 設定地圖中心與層級
-    map_center = [23.161, 120.645] # 小林村獻肚山周邊
-    map_zoom = 14
-
-    solara.Title("八八風災：災前影像 vs 街道圖對照")
+    # 運算數據
+    diff_map, stats = solara.use_memo(lambda: get_ndvi_analysis() if is_ok else (None, None), [is_ok])
 
     with solara.Column(style={"padding": "20px"}):
-        solara.Markdown("# 🌪️ 八八風災小林村：空間環境回顧")
-        
-        # 使用 Markdown 代替會報錯的 solara.Divider()
+        solara.Title("NDVI 變遷分析")
+        solara.Markdown("# 🛰️ 八八風災前後 NDVI 變遷偵測")
         solara.Markdown("---")
 
         if not is_ok:
-            solara.Error(f"⚠️ GEE 初始化失敗：{msg}")
-            solara.Markdown("請檢查 Hugging Face Secrets 是否已正確設定 `GEE_SERVICE_ACCOUNT`。")
+            solara.Error(f"GEE 初始化失敗：{msg}")
             return
 
-        with solara.Card(title="影像對照：災前衛星(左) vs 目前街道(右)"):
-            with solara.Column():
-                # 建立地圖物件
-                m = geemap.Map(
-                    center=map_center, 
-                    zoom=map_zoom, 
-                    height="600px"
-                )
-
-                # 取得無雲影像圖層
-                satellite_layer = get_satellite_layer(map_center)
-
-                # 執行 Split Map：左邊影像，右邊街道圖
-                m.split_map(left_layer=satellite_layer, right_layer='ROADMAP')
+        with solara.Row():
+            # 左側：地圖
+            with solara.Column(md=8):
+                solara.Markdown("### 🗺️ NDVI 差異圖 (2010 - 2008)")
+                m = geemap.Map(center=[23.16, 120.64], zoom=14)
+                m.add_basemap('HYBRID')
                 
-                # 顯示地圖
-                solara.FigureFolium(m)
+                if diff_map:
+                    vis = {'min': -0.6, 'max': 0.6, 'palette': ['#800000', '#ff0000', '#ffffff', '#00ff00', '#008000']}
+                    m.addLayer(diff_map, vis, 'NDVI Change')
+                    m.add_legend(title="NDVI 變化說明", legend_dict={
+                        '嚴重崩塌 (<-0.3)': '#800000',
+                        '植被流失 (-0.3~-0.1)': '#ff0000',
+                        '穩定/恢復 (>-0.1)': '#ffffff'
+                    })
+                
+                # ★★★ 修正點：使用 solara.display(m) 替代 solara.FigureFolium(m) ★★★
+                solara.display(m)
 
-        solara.Markdown("---")
-        solara.Markdown("""
-        ### 🔍 技術說明
-        1. **左側圖層 (災前衛星)**：採用 **Landsat 5 TM** 影像，透過 2008-2009 年之 **Median Composite (中位數合成)** 技術排除雲霧。
-        2. **右側圖層 (街道圖)**：使用目前 OpenStreetMap 道路圖，可用於對照災前河谷聚落與今日交通線的相對位置。
-        """)
-        
-        # 使用 Vuetify 的分隔線 (另一種方案)
-        solara.v.Divider()
-        solara.Caption("地理系專案報告 | 資料來源：NASA/USGS & Google Earth Engine")
+            # 右側：數據
+            with solara.Column(md=4):
+                solara.Markdown("### 📊 變遷統計比例")
+                if stats:
+                    s = stats.get('severe', 0)
+                    l = stats.get('loss', 0)
+                    stb = stats.get('stable', 0)
+                    total = s + l + stb
+                    
+                    if total > 0:
+                        solara.Error(f"🔴 嚴重崩塌比例: {s/total:.1%}")
+                        solara.Warning(f"🟠 植被流失比例: {l/total:.1%}")
+                        solara.Success(f"⚪ 穩定與復育比例: {stb/total:.1%}")
+                        solara.Markdown("---")
+                        solara.Markdown(f"**受災影響總面積比例：{(s+l)/total:.1%}**")
+                    else:
+                        solara.Info("正在計算統計數據...")
+                else:
+                    solara.ProgressLinear(True)
 
-# 啟動頁面
-Page()
