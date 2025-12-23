@@ -12,7 +12,7 @@ def init_gee():
         # 取得 Secrets 環境變數
         sa = os.environ.get("GEE_SERVICE_ACCOUNT")
         key = os.environ.get("GEE_JSON_KEY")
-        project = os.environ.get("ee.julia200594714") 
+        project = "ee-julia200594714"
         
         if sa and key:
             # 解析金鑰，若沒設 GEE_PROJECT 則嘗試從金鑰中自動抓取
