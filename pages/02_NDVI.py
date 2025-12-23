@@ -6,9 +6,9 @@ import geemap.foliumap as geemap
 from google.oauth2 import service_account
 
 # ==========================================
-# 1. GEE 初始化與認證 (與主頁保持一致)
+# 1. GEE 認證與初始化 (與主頁一致)
 # ==========================================
-MY_PROJECT_ID = 'ee-julia200594714'
+MY_PROJECT_ID = 'ee-julia200594714' 
 
 def initialize_gee():
     try:
@@ -19,32 +19,32 @@ def initialize_gee():
             ee.Initialize(credentials, project=MY_PROJECT_ID)
             return True, "✅ 初始化成功"
         else:
-            return False, "找不到 GEE_SERVICE_ACCOUNT Secret"
+            return False, "❌ 找不到 GEE_SERVICE_ACCOUNT"
     except Exception as e:
         return False, str(e)
 
 # ==========================================
-# 2. 地理運算邏輯
+# 2. 地理運算邏輯 (NDVI 差異分析)
 # ==========================================
 def get_ndvi_analysis():
-    # 小林村 ROI
+    # 小林村區域
     roi = ee.Geometry.Polygon([[[120.61, 23.185], [120.61, 23.135], [120.67, 23.135], [120.67, 23.185], [120.61, 23.185]]])
     
     def addNDVI(img):
         return img.addBands(img.normalizedDifference(['SR_B4', 'SR_B3']).rename('NDVI'))
 
-    # 取得災前(2008)與災後(2010)中位數影像
-    pre_img = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2").filterDate('2008-01-01', '2008-12-31').filterBounds(roi).map(addNDVI).median().clip(roi)
-    post_img = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2").filterDate('2010-01-01', '2010-12-31').filterBounds(roi).map(addNDVI).median().clip(roi)
+    # 取得 2008(災前) 與 2010(災後) 的 Landsat 5 中位數影像
+    pre = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2").filterDate('2008-01-01', '2008-12-31').filterBounds(roi).map(addNDVI).median().clip(roi)
+    post = ee.ImageCollection("LANDSAT/LT05/C02/T1_L2").filterDate('2010-01-01', '2010-12-31').filterBounds(roi).map(addNDVI).median().clip(roi)
 
-    # 計算 NDVI 差異 (2010 - 2008)
-    diff = post_img.select('NDVI').subtract(pre_img.select('NDVI'))
+    # 計算差異: 災後 - 災前
+    diff = post.select('NDVI').subtract(pre.select('NDVI'))
 
-    # 統計分類
+    # 分類統計區域
     def classify(img):
-        severe = img.lt(-0.3).rename('severe')
-        loss = img.lt(-0.1).And(img.gte(-0.3)).rename('loss')
-        stable = img.gte(-0.1).rename('stable')
+        severe = img.lt(-0.3).rename('severe')        # 嚴重崩塌
+        loss = img.lt(-0.1).And(img.gte(-0.3)).rename('loss') # 一般流失
+        stable = img.gte(-0.1).rename('stable')       # 穩定
         return img.addBands([severe, loss, stable])
 
     classified = classify(diff)
@@ -53,14 +53,14 @@ def get_ndvi_analysis():
     return diff, stats
 
 # ==========================================
-# 3. UI 呈現
+# 3. Solara 介面呈現
 # ==========================================
 @solara.component
 def Page():
     # 初始化
     is_ok, msg = solara.use_memo(initialize_gee, [])
     
-    # 運算數據
+    # 執行地理計算
     diff_map, stats = solara.use_memo(lambda: get_ndvi_analysis() if is_ok else (None, None), [is_ok])
 
     with solara.Column(style={"padding": "20px"}):
@@ -73,7 +73,7 @@ def Page():
             return
 
         with solara.Row():
-            # 左側：地圖
+            # 左側：地圖顯示
             with solara.Column(md=8):
                 solara.Markdown("### 🗺️ NDVI 差異圖 (2010 - 2008)")
                 m = geemap.Map(center=[23.16, 120.64], zoom=14)
@@ -82,18 +82,18 @@ def Page():
                 if diff_map:
                     vis = {'min': -0.6, 'max': 0.6, 'palette': ['#800000', '#ff0000', '#ffffff', '#00ff00', '#008000']}
                     m.addLayer(diff_map, vis, 'NDVI Change')
-                    m.add_legend(title="NDVI 變化說明", legend_dict={
+                    m.add_legend(title="NDVI 變化圖例", legend_dict={
                         '嚴重崩塌 (<-0.3)': '#800000',
                         '植被流失 (-0.3~-0.1)': '#ff0000',
-                        '穩定/恢復 (>-0.1)': '#ffffff'
+                        '無變化/恢復 (>-0.1)': '#ffffff'
                     })
                 
-                # ★★★ 修正點：使用 solara.display(m) 替代 solara.FigureFolium(m) ★★★
+                # ★★★ 核心修正：使用 solara.display(m) 替代 solara.FigureFolium(m) ★★★
                 solara.display(m)
 
-            # 右側：數據
+            # 右側：統計摘要
             with solara.Column(md=4):
-                solara.Markdown("### 📊 變遷統計比例")
+                solara.Markdown("### 📊 變遷比例統計")
                 if stats:
                     s = stats.get('severe', 0)
                     l = stats.get('loss', 0)
@@ -105,9 +105,10 @@ def Page():
                         solara.Warning(f"🟠 植被流失比例: {l/total:.1%}")
                         solara.Success(f"⚪ 穩定與復育比例: {stb/total:.1%}")
                         solara.Markdown("---")
-                        solara.Markdown(f"**受災影響總面積比例：{(s+l)/total:.1%}**")
+                        solara.Markdown(f"**受災影響總面積：{(s+l)/total:.1%}**")
                     else:
-                        solara.Info("正在計算統計數據...")
+                        solara.Info("數據讀取中...")
                 else:
                     solara.ProgressLinear(True)
+
 
