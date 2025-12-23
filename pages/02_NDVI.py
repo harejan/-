@@ -68,8 +68,6 @@ def run_analysis_task():
     total = r + g + n
     ratios = {"red": r/total, "green": g/total, "neutral": n/total} if total > 0 else {"red":0,"green":0,"neutral":0}
 
-    return diff, pre_ndvi, post_ndvi, ratios, f"災前:{pre_count} | 災後:{post_count}"
-
 # ==========================================
 # 3. Solara 介面渲染
 # ==========================================
@@ -79,7 +77,7 @@ def Page():
     result = solara.use_thread(run_analysis_task, dependencies=[ok_status])
 
     with solara.Column(style={"padding": "20px"}):
-        solara.Title("🛰️ 八八風災 NDVI 變遷分佈 (紅色為崩塌受災區)")
+        solara.Title("🛰️ 八八風災 NDVI 變遷")
 
         if result.state == solara.ResultState.FINISHED:
             diff_img, pre_ndvi, post_ndvi, ratios, debug_info = result.value
@@ -116,5 +114,5 @@ def Page():
             solara.display(m)
 
         elif result.state == solara.ResultState.RUNNING:
-            solara.Info("⏳ 請稍候...")
+            solara.Info("⏳ 載入中，請稍候...")
             solara.ProgressLinear(True)
